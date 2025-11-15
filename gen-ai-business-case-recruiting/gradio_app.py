@@ -28,12 +28,13 @@ import gradio as gr
 from dotenv import load_dotenv
 import os
 
+
 # TODO: Import the necessary components from your RAG system
 # Hint: You'll need FAISSIndex, LLM, and possibly EmbeddingsService
-# from src.services.vectorial_db.faiss_index import FAISSIndex
-# from src.services.models.llm import LLM
-# from src.services.models.embeddings import EmbeddingsService
-# from src.ingestion.ingest_files import ingest_files_data_folder
+from src.services.vectorial_db.faiss_index import FAISSIndex
+from src.services.models.llm import LLM
+from src.services.models.embeddings import Embeddings
+from src.ingestion.ingest_files import ingest_files_data_folder
 
 
 # Load environment variables
@@ -48,23 +49,23 @@ load_dotenv(override=True)
 # These should be initialized once when the app starts, not on every request
 # 
 # Example:
-# embeddings_service = EmbeddingsService()
-# faiss_index = FAISSIndex(dimension=3072, embeddings=embeddings_service)
-# llm = LLM()
+embeddings_service = Embeddings()
+faiss_index = FAISSIndex(dimension=3072, embeddings=embeddings_service.get_embeddings)
+llm = LLM()
 #
 # # Load existing index or ingest documents
-# try:
-#     faiss_index.load_index()
-#     print("✅ Loaded existing FAISS index")
-# except:
-#     print("📁 No existing index found. Ingesting documents...")
-#     ingest_files_data_folder(faiss_index)
-#     faiss_index.save_index()
-#     print("✅ Documents ingested and index saved")
+try:
+    faiss_index.load_index()
+    print("✅ Loaded existing FAISS index")
+except:
+    print("📁 No existing index found. Ingesting documents...")
+    ingest_files_data_folder(faiss_index)
+    faiss_index.save_index()
+    print("✅ Documents ingested and index saved")
 
 
 # TODO: Initialize global variables for state management
-# conversation_histories = {}  # Dictionary to store conversation history per session
+conversation_histories = {}  # Dictionary to store conversation history per session
 
 
 # ============================================================================
@@ -148,22 +149,21 @@ def chatbot_response(message, history):
     TODO: Implement the complete RAG pipeline here
     """
     # TODO: Step 1 - Convert Gradio history format to LLM format
-    # Gradio history: [(user_msg, bot_msg), (user_msg, bot_msg), ...]
-    # LLM expects: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}, ...]
-    #
-    # llm_history = []
-    # for user_msg, bot_msg in history:
-    #     llm_history.append({"role": "user", "content": user_msg})
-    #     if bot_msg:  # bot_msg might be None for the current message
-    #         llm_history.append({"role": "assistant", "content": bot_msg})
+
+    llm_history = []
+    for user_msg, bot_msg in history:
+        llm_history.append({"role": "user", "content": user_msg})
+        if bot_msg:  # bot_msg might be None for the current message
+            llm_history.append({"role": "assistant", "content": bot_msg})
     
     # TODO: Step 2 - Retrieve relevant chunks from FAISS
-    # retrieved_chunks = faiss_index.retrieve_chunks(message, num_chunks=5)
-    # context = "\n\n#####\n\n".join(retrieved_chunks)
+    retrieved_chunks = faiss_index.retrieve_chunks(message, num_chunks=5)
+    context = "\n\n#####\n\n".join(retrieved_chunks)
     
     # TODO: Step 3 - Generate response using LLM with context
-    # response = llm.get_response(llm_history, context, message)
+    response = llm.get_response(llm_history, context, message)
     
+    formatted_response = f"{response}\n\n---\n"
     # TODO: Step 4 - Add source citations
     # sources = format_sources(retrieved_chunks)
     # formatted_response = f"{response}\n\n---\n{sources}"
@@ -174,10 +174,10 @@ def chatbot_response(message, history):
     #     formatted_response += f"\n\n{products}"
     
     # TODO: Return the complete formatted response
-    # return formatted_response
+    return formatted_response
     
     # PLACEHOLDER: Remove this once you implement the above
-    return f"🚧 **TODO**: Implement chatbot_response() function\n\nYou said: {message}\n\nThis is where the RAG pipeline should process your question and return an answer with sources."
+    # return f"🚧 **TODO**: Implement chatbot_response() function\n\nYou said: {message}\n\nThis is where the RAG pipeline should process your question and return an answer with sources."
 
 
 def reset_conversation():
@@ -252,27 +252,28 @@ def upload_document(file):
     HINT: You can reuse code from ingest_files.py
     """
     # TODO: Implement document upload and ingestion
-    # import tempfile
-    # import shutil
-    # from src.ingestion.loaders.loader import Loader
-    # from src.ingestion.chunking.token_chunking import text_to_chunks
-    #
-    # # Save uploaded file
-    # temp_path = tempfile.mktemp(suffix=os.path.splitext(file.name)[1])
-    # shutil.copy(file.name, temp_path)
-    #
-    # # Load and process
-    # loader = Loader()
-    # text = loader.load(temp_path)
-    # chunks = text_to_chunks(text)
-    #
-    # # Add to index
-    # faiss_index.ingest_text(text_chunks=chunks)
-    # faiss_index.save_index()
-    #
-    # return f"✅ Successfully ingested {file.name}"
+    import tempfile
+    import shutil
+    from src.ingestion.loaders.loader import Loader
+    from src.ingestion.chunking.token_chunking import text_to_chunks
     
-    return "🚧 TODO: Implement upload_document() function"
+    # Save uploaded file
+    temp_path = tempfile.mktemp(suffix=os.path.splitext(file.name)[1])
+    print("\n\n\n\n\n\n\n\n\n\n" + temp_path + "\n\n\n\nn\n\n\n\n\n")
+    shutil.copy(file.name, temp_path)
+    
+    # Load and process
+    loader = Loader()
+    text = loader.load(temp_path)
+    chunks = text_to_chunks(text)
+    
+    # Add to index
+    faiss_index.ingest_text(text_chunks=chunks)
+    faiss_index.save_index()
+    
+    return f"✅ Successfully ingested {file.name}"
+    
+    # return "🚧 TODO: Implement upload_document() function"
 
 
 # ============================================================================
@@ -318,22 +319,22 @@ def create_interface():
     # TODO: OPTION 1 - Simple Chat Interface (Recommended for MVP)
     # This is the quickest way to get started
     #
-    # interface = gr.ChatInterface(
-    #     fn=chatbot_response,
-    #     title="🌍 EcoGuide - Climate Change Chatbot",
-    #     description="Ask me anything about climate change, carbon emissions, or sustainable products!",
-    #     examples=[
-    #         "What is climate change?",
-    #         "How can I reduce my carbon footprint?",
-    #         "What are carbon offset strategies?",
-    #         "Recommend sustainable products for my home",
-    #         "Explain the greenhouse gas protocol"
-    #     ],
-    #     theme=gr.themes.Soft(),
-    #     retry_btn="🔄 Retry",
-    #     undo_btn="↩️ Undo",
-    #     clear_btn="🗑️ Clear",
-    # )
+    interface = gr.ChatInterface(
+        fn=chatbot_response,
+        title="🌍 EcoGuide - Climate Change Chatbot",
+        description="Ask me anything about climate change, carbon emissions, or sustainable products!",
+        examples=[
+            "What is climate change?",
+            "How can I reduce my carbon footprint?",
+            "What are carbon offset strategies?",
+            "Recommend sustainable products for my home",
+            "Explain the greenhouse gas protocol"
+        ],
+        theme=gr.themes.Soft(),
+        # retry_btn="🔄 Retry",
+        # undo_btn="↩️ Undo",
+        # clear_btn="🗑️ Clear",
+    )
     
     # TODO: OPTION 2 - Advanced Interface with Blocks (More Features)
     # Use this for a more customized interface with multiple features
@@ -341,24 +342,24 @@ def create_interface():
     # with gr.Blocks(theme=gr.themes.Soft(), title="EcoGuide Chatbot") as interface:
     #     gr.Markdown("# 🌍 EcoGuide - Your Climate Change Assistant")
     #     gr.Markdown("Ask questions about climate change and get AI-powered answers with sources!")
-    #     
+        
     #     with gr.Tab("💬 Chat"):
     #         chatbot = gr.Chatbot(
     #             height=500,
     #             show_label=False,
-    #             avatar_images=(None, "🌍")  # User, Bot avatars
+    #             avatar_images=(None, "🌍"),  # User, Bot avatars
     #         )
     #         msg = gr.Textbox(
     #             placeholder="Type your question here...",
     #             show_label=False,
     #             container=False
     #         )
-    #         
+            
     #         with gr.Row():
     #             submit = gr.Button("Send 📤", variant="primary")
     #             clear = gr.Button("Clear 🗑️")
     #             export = gr.Button("Export 💾")
-    #         
+            
     #         # Examples
     #         gr.Examples(
     #             examples=[
@@ -369,13 +370,13 @@ def create_interface():
     #             ],
     #             inputs=msg
     #         )
-    #         
+            
     #         # Wire up the interactions
     #         msg.submit(chatbot_response, [msg, chatbot], [chatbot])
     #         submit.click(chatbot_response, [msg, chatbot], [chatbot])
     #         clear.click(reset_conversation, None, [chatbot, msg])
     #         export.click(export_conversation, [chatbot], [gr.Textbox(label="Export Path")])
-    #     
+        
     #     with gr.Tab("📁 Documents"):
     #         gr.Markdown("### Upload New Documents")
     #         file_upload = gr.File(
@@ -384,54 +385,54 @@ def create_interface():
     #         )
     #         upload_btn = gr.Button("Upload & Ingest 📤", variant="primary")
     #         upload_status = gr.Textbox(label="Status", interactive=False)
-    #         
+            
     #         upload_btn.click(upload_document, [file_upload], [upload_status])
-    #         
+            
     #         gr.Markdown("### Current Documents")
     #         gr.Markdown("- Greenhouse_ga_protocol_corporate_standard_FAQ.html")
     #         gr.Markdown("- sustainable_products.csv")
     #         gr.Markdown("_TODO: Make this dynamic by reading from data folder_")
-    #     
-    #     with gr.Tab("⚙️ Settings"):
-    #         gr.Markdown("### RAG Settings")
-    #         
-    #         num_chunks = gr.Slider(
-    #             minimum=1,
-    #             maximum=10,
-    #             value=5,
-    #             step=1,
-    #             label="Number of chunks to retrieve",
-    #             info="More chunks = more context but slower"
-    #         )
-    #         
-    #         show_sources = gr.Checkbox(
-    #             label="Show source citations",
-    #             value=True,
-    #             info="Display which documents were used for the answer"
-    #         )
-    #         
-    #         chunking_strategy = gr.Dropdown(
-    #             choices=["token", "sentence", "semantic"],
-    #             value="token",
-    #             label="Chunking Strategy",
-    #             info="How to split documents (requires re-ingestion to apply)"
-    #         )
-    #         
-    #         gr.Markdown("_TODO: Wire up these settings to actually affect the RAG pipeline_")
+        
+        # with gr.Tab("⚙️ Settings"):
+        #     gr.Markdown("### RAG Settings")
+            
+        #     num_chunks = gr.Slider(
+        #         minimum=1,
+        #         maximum=10,
+        #         value=5,
+        #         step=1,
+        #         label="Number of chunks to retrieve",
+        #         info="More chunks = more context but slower"
+        #     )
+            
+        #     show_sources = gr.Checkbox(
+        #         label="Show source citations",
+        #         value=True,
+        #         info="Display which documents were used for the answer"
+        #     )
+            
+        #     chunking_strategy = gr.Dropdown(
+        #         choices=["token", "sentence", "semantic"],
+        #         value="token",
+        #         label="Chunking Strategy",
+        #         info="How to split documents (requires re-ingestion to apply)"
+        #     )
+            
+        #     gr.Markdown("_TODO: Wire up these settings to actually affect the RAG pipeline_")
     
     # PLACEHOLDER: Simple interface until you implement one of the above
-    interface = gr.Interface(
-        fn=lambda x: "🚧 **Not Implemented Yet**\n\nTODO: Complete the Gradio interface implementation.\n\nSee gradio_app.py for detailed instructions.",
-        inputs=gr.Textbox(label="Your Question", placeholder="Ask about climate change..."),
-        outputs=gr.Textbox(label="Response"),
-        title="🌍 EcoGuide - Climate Change Chatbot",
-        description="⚠️ Under Construction - See gradio_app.py to implement the full interface",
-        examples=[
-            "What is climate change?",
-            "How can I reduce my carbon footprint?",
-            "Recommend sustainable products"
-        ]
-    )
+    # interface = gr.Interface(
+    #     fn=lambda x: "🚧 **Not Implemented Yet**\n\nTODO: Complete the Gradio interface implementation.\n\nSee gradio_app.py for detailed instructions.",
+    #     inputs=gr.Textbox(label="Your Question", placeholder="Ask about climate change..."),
+    #     outputs=gr.Textbox(label="Response"),
+    #     title="🌍 EcoGuide - Climate Change Chatbot",
+    #     description="⚠️ Under Construction - See gradio_app.py to implement the full interface",
+    #     examples=[
+    #         "What is climate change?",
+    #         "How can I reduce my carbon footprint?",
+    #         "Recommend sustainable products"
+    #     ]
+    # )
     
     return interface
 
@@ -451,14 +452,14 @@ def main():
     print("=" * 80)
     
     # TODO: Uncomment and configure launch parameters
-    # interface = create_interface()
-    # interface.launch(
-    #     server_name="0.0.0.0",  # Listen on all network interfaces
-    #     server_port=7860,        # Port number
-    #     share=False,             # Set True to create public link (via Gradio servers)
-    #     debug=True,              # Enable debug mode for development
-    #     show_error=True          # Show detailed errors
-    # )
+    interface = create_interface()
+    interface.launch(
+        server_name="localhost",  # Listen on all network interfaces
+        server_port=7860,        # Port number
+        share=False,             # Set True to create public link (via Gradio servers)
+        debug=True,              # Enable debug mode for development
+        show_error=True          # Show detailed errors
+    )
     
     # PLACEHOLDER: Show instructions
     print("\n⚠️  Gradio interface not yet implemented!")
